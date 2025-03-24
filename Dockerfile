@@ -1,13 +1,10 @@
-# Use an official lightweight Python image
-FROM python:3.10-slim
-
 # Set the working directory
 WORKDIR /app
 
 # Copy all files to the container
 COPY . /app
 
-# Install system dependencies (required for yt-dlp)
+# Install system dependencies (required for yt-dlp and ffmpeg)
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
