@@ -28,6 +28,8 @@ HEALTHCHECK --interval=30s --timeout=3s \
 
 # Expose port
 EXPOSE 8000
+# Set AWS region (important for R2)
+ENV AWS_DEFAULT_REGION=auto
 
 # Run the server
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

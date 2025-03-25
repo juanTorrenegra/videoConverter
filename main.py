@@ -5,11 +5,11 @@ import os
 import boto3
 from botocore.exceptions import NoCredentialsError
 import uuid
-from typing import Optional
+from datetime import datetime, timedelta
 
 app = FastAPI()
 
-# Cloudflare R2 credentials (consider using environment variables)
+# Cloudflare R2 credentials
 R2_ENDPOINT = "https://71a0ff806103c65512db9543fdc4f7ce.r2.cloudflarestorage.com"
 R2_ACCESS_KEY = "8031c1875c29a19e106b13ca8f82b703"
 R2_SECRET_KEY = "92d96290c2dd54b6510bd4aa60214f9f47f99b8acee0d9a64acca99035295ef1"
@@ -21,6 +21,7 @@ s3_client = boto3.client(
     endpoint_url=R2_ENDPOINT,
     aws_access_key_id=R2_ACCESS_KEY,
     aws_secret_access_key=R2_SECRET_KEY,
+    region_name="auto"  # Important for R2
 )
 
 # Serve the index.html file
@@ -30,7 +31,6 @@ def serve_index():
         raise HTTPException(status_code=404, detail="index.html not found")
     return FileResponse("index.html")
 
-# Download endpoint
 @app.get("/download/")
 def download(url: str, format: str = "mp4"):
     try:
@@ -42,63 +42,49 @@ def download(url: str, format: str = "mp4"):
         unique_id = uuid.uuid4().hex
         output_filename = f"video_{unique_id}.{format}"
         
-        # Build yt-dlp command with multiple fallback options
+        # Download with yt-dlp (same as before)
         command = [
             "yt-dlp",
             "-f", f"bestvideo[ext={format}]+bestaudio[ext=m4a]/best[ext={format}]/best",
-            "--add-header", "User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+            "--add-header", "User-Agent:Mozilla/5.0",
             "--add-header", "Referer:https://www.youtube.com/",
             "--extractor-args", "youtube:player_client=android",
-            "--retries", "10",
-            "--socket-timeout", "30",
-            "--force-ipv4",
             "-o", output_filename,
             url
         ]
         
-        # Execute download
         result = subprocess.run(command, capture_output=True, text=True)
-
         if result.returncode != 0:
-            # Try fallback method if first attempt fails
-            fallback_command = [
-                "yt-dlp",
-                "-f", "best",
-                "--add-header", "User-Agent:Mozilla/5.0",
-                "-o", output_filename,
-                url
-            ]
-            result = subprocess.run(fallback_command, capture_output=True, text=True)
-            if result.returncode != 0:
-                raise HTTPException(status_code=400, detail=f"Download failed: {result.stderr}")
+            raise HTTPException(status_code=400, detail=f"Download failed: {result.stderr}")
 
-        # Verify file was created
-        if not os.path.exists(output_filename):
-            raise HTTPException(status_code=500, detail="File not created after download")
-
-        # Upload to Cloudflare R2
+        # Upload to R2
         try:
             s3_client.upload_file(
                 output_filename,
                 R2_BUCKET_NAME,
                 output_filename,
-                ExtraArgs={'ACL': 'public-read', 'ContentType': f'video/{format}'}
+                ExtraArgs={'ContentType': f'video/{format}'}
             )
-        except NoCredentialsError:
-            raise HTTPException(status_code=500, detail="Cloudflare R2 credentials error")
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
-        # Generate public URL (adjust based on your R2 configuration)
-        file_url = f"{R2_ENDPOINT}/{R2_BUCKET_NAME}/{output_filename}"
-        
+        # Generate pre-signed URL (valid for 1 hour)
+        presigned_url = s3_client.generate_presigned_url(
+            'get_object',
+            Params={
+                'Bucket': R2_BUCKET_NAME,
+                'Key': output_filename
+            },
+            ExpiresIn=3600
+        )
+
         # Clean up local file
         try:
             os.remove(output_filename)
         except:
             pass
 
-        return RedirectResponse(file_url)
+        return RedirectResponse(presigned_url)
         
     except HTTPException:
         raise
