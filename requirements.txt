@@ -1,4 +1,5 @@
-fastapi
-uvicorn
-yt-dlp
-boto3
+fastapi>=0.95.2
+uvicorn>=0.22.0
+yt-dlp>=2023.7.6
+boto3>=1.26.0
+python-multipart>=0.0.6
