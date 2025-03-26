@@ -37,7 +37,7 @@ h1 {
     cursor: pointer;
     background: #ddd;
     border-radius: 5px;
-    transition: background 0.3s;
+    transition: background 1s;
 }
 
 .tab.active {
@@ -109,6 +109,16 @@ button:hover {
     height: 40px;
     animation: spin 1s linear infinite;
 }
+.warning {
+    
+    padding: 12px 20px;
+    margin: 30px 5px;
+    cursor: pointer;
+    color:#0056b3;
+    border-radius: 5px;
+    transition: background 2s;
+    font-size: 2em;
+}
 
 
 @keyframes spin {
@@ -145,6 +155,10 @@ button:hover {
             <div id="loading" class="loading"></div>
         </form>
     </div>
+    <div class="warning">
+        !Please use video lenght 5 min max! 
+    </div>
+    <div>Beta prototype Juan Torrenegra®</div>
     
     <!-- ... (keep your existing cookie upload section) ... -->
 
